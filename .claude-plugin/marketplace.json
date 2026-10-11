@@ -1,0 +1,13 @@
+{
+  "name": "cc-progress-bar",
+  "description": "A full-width Claude Code progress bar that tracks todos, tasks and spawned subagents",
+  "owner": {
+    "name": "jmartinez5120"
+  },
+  "plugins": [
+    {
+      "name": "progress-bar",
+      "source": "./"
+    }
+  ]
+}

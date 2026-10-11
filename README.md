@@ -1,0 +1,42 @@
+# progress-bar
+
+A Claude Code mod that draws a full-width progress bar above the prompt, showing how far along Claude is on the task you gave it, including the subagents it spawns.
+
+```
+▕██████████████████████████████████▌░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░▏  50%
+  Writing fix · 1/3 tasks · 0/1 agents · 12 tools
+    ⎿ ◐ Explore · find the bug
+```
+
+## Install
+
+At the prompt of a Claude Code terminal session:
+
+```
+/plugin install progress-bar --marketplace jmartinez5120/cc-progress-bar
+```
+
+Answer `y` to add the marketplace, then press Enter to install at user scope. The bar is active immediately.
+
+## How progress is measured
+
+- **Todos and tasks.** Claude's `TodoWrite` list and `TaskCreate`/`TaskUpdate` tasks: completed = 1, in progress = ½, pending = 0.
+- **Agents.** Every spawned subagent is one unit, nested ones included (drawn indented under their parent): running = ½, finished or failed = 1.
+- **Turn end.** The bar holds at 99% while Claude is still working and reaches 100% only when the turn really ends, with the total time since your prompt. An interrupted turn shows as `interrupted`.
+- **Background agents.** If the turn ends with agents still running, it shows `waiting on N background agents`. Their hand-backs continue the task instead of resetting it.
+- **Nothing countable yet.** An empty track with `working` and a tool count.
+- **New task.** Only a prompt from a person (terminal, Remote Control, SDK, scheduled task) starts a new task; finished work is cleared, unfinished todos and running agents are kept.
+
+The bar spans the terminal's width and follows it when you resize.
+
+## Commands
+
+- `/progress-bar` shows or hides the bar.
+
+## Develop
+
+```
+claude --plugin-dir .            # run a session with this folder loaded
+claude plugin validate .
+claude plugin test .
+```

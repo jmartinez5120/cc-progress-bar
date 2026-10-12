@@ -1,6 +1,6 @@
 {
   "name": "progress-bar",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "A progress bar above the prompt showing how far along Claude is on the task, counting todos/tasks and spawned subagents",
   "author": {
     "name": "jmartinez5120",

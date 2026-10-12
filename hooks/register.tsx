@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { Register } from 'claude-code'
+import type { AgentInfo, EngineInterface, Register } from 'claude-code'
 
 import type { AgentRun, Progress, WorkItem } from '../types'
 
@@ -13,6 +13,11 @@ const MAX_AGENT_ROWS = 4
 // The percentage at the bar's right end (` 100%`) and the bar's two caps.
 const PERCENT_CELLS = 5
 const CAP_CELLS = 2
+// Estimated mode: ~45% after 7 tool calls, ~75% after 20, capped at 90%.
+const ESTIMATE_CAP = 0.9
+const ESTIMATE_PACE = 12
+const LIVE_AGENT = new Set(['pending', 'running', 'waiting'])
+const ENDED_AGENT = new Set(['completed', 'failed', 'killed'])
 const NEW_TASK_ORIGINS = new Set(['composer', 'bridge', 'sdk', 'scheduled-trigger'])
 
 // An in-flight item counts as half done, so the bar moves when work starts,
@@ -20,13 +25,19 @@ const NEW_TASK_ORIGINS = new Set(['composer', 'bridge', 'sdk', 'scheduled-trigge
 const ITEM_WEIGHT = { pending: 0, in_progress: 0.5, completed: 1 } as const
 const AGENT_WEIGHT = { running: 0.5, done: 1, failed: 1 } as const
 
-/** Done fraction in [0, 1], or null when nothing countable exists yet. */
+/** Done fraction in [0, 1], or null before any work at all. */
 const fraction = (p: Progress): number | null => {
   const items = [...p.todos, ...p.tasks]
   const units = items.length + p.agents.length
 
   if (units === 0) {
-    return p.phase === 'done' ? 1 : null
+    if (p.phase === 'done') {
+      return 1
+    }
+
+    // Nothing countable (no todo list, no agents): estimate from activity,
+    // fast at first and flattening out, never past ESTIMATE_CAP.
+    return p.tools === 0 ? null : ESTIMATE_CAP * (1 - Math.exp(-p.tools / ESTIMATE_PACE))
   }
 
   const done =
@@ -40,6 +51,9 @@ const fraction = (p: Progress): number | null => {
   // Everything ticked off but the turn still running: hold at 99%.
   return Math.min(done / units, 0.99)
 }
+
+const isEstimate = (p: Progress) =>
+  p.todos.length + p.tasks.length + p.agents.length === 0 && p.phase !== 'done'
 
 /** The filled run (with its partial eighth) and the empty track after it. */
 const bar = (ratio: number, width: number) => {
@@ -70,6 +84,42 @@ const seconds = (ms: number) =>
 
 const setTask = (tasks: WorkItem[], id: string, patch: Partial<WorkItem>) =>
   tasks.map(t => (t.id === id ? { ...t, ...patch } : t))
+
+/**
+ * Adds running agents this mod never saw start (spawned before it loaded,
+ * or by a path that raised no agent.spawn) and settles ones that ended.
+ */
+const syncAgents = async ($: EngineInterface) => {
+  const roster = await $.agent.list().catch(() => [] as readonly AgentInfo[])
+
+  if (roster.length === 0) {
+    return
+  }
+
+  await update($, progress, (p): Progress => {
+    const known = new Set(p.agents.map(a => a.id))
+    const ended = new Map(roster.filter(a => ENDED_AGENT.has(a.status)).map(a => [a.id, a.status]))
+    const missed: AgentRun[] = roster
+      .filter(a => LIVE_AGENT.has(a.status) && !known.has(a.id))
+      .map(a => ({ id: a.id, label: a.description, type: a.type, parentId: a.parentId, status: 'running' }))
+
+    if (missed.length === 0 && !p.agents.some(a => a.status === 'running' && ended.has(a.id))) {
+      return p
+    }
+
+    return {
+      ...p,
+      agents: [
+        ...p.agents.map(a =>
+          a.status === 'running' && ended.has(a.id)
+            ? { ...a, status: ended.get(a.id) === 'completed' ? ('done' as const) : ('failed' as const) }
+            : a,
+        ),
+        ...missed,
+      ],
+    }
+  })
+}
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
@@ -109,14 +159,17 @@ export const register: Register = on => {
   // Main loop only: a subagent's run raises no turn.start.
   on('turn.start', async ($, e, next) => {
     await update($, progress, (p): Progress => ({ ...p, phase: 'working', durationMs: undefined }))
+    await syncAgents($)
 
     return next(e)
   })
 
   on('tool.call', async ($, e, next) => {
     await update($, progress, (p): Progress => ({ ...p, tools: p.tools + 1 }))
+    const ran = await next(e)
+    await syncAgents($)
 
-    return next(e)
+    return ran
   })
 
   on('tool.call', { tool: 'TodoWrite' }, async ($, e, next) => {
@@ -263,7 +316,7 @@ export const register: Register = on => {
           <Text color={color}>▕{filled}</Text>
           <Text dimColor>{track}</Text>
           <Text color={color}>▏</Text>
-          <Text bold>{(ratio === null ? '…' : `${Math.round(ratio * 100)}%`).padStart(PERCENT_CELLS)}</Text>
+          <Text bold>{(ratio === null ? '…' : `${isEstimate(p) ? '~' : ''}${Math.round(ratio * 100)}%`).padStart(PERCENT_CELLS)}</Text>
         </Box>
         <Box>
           <Text wrap="truncate-end">

@@ -126,3 +126,26 @@ test('the bar spans the band and follows its width', async ($, on) => {
     expect(cells).toBe(bodyColumns)
   }
 })
+
+test('with nothing countable the bar estimates from activity, then fills at the end', async ($, on) => {
+  mock.clock(on)
+  on('turn.start', ($, e) => ({ turnId: e.turnId }))
+  on('tool.call', () => ({ result: { oldTodos: [], newTodos: [] } }))
+  on('turn.complete', ($, e) => ({ text: e.answer }))
+
+  await $.turn.start({ text: 'fix it', turnId: 't1' })
+  const before = await $.ui.mount({ plugin: 'progress-bar', surface: 'terminal', ...BAND })
+  expect(await before.find({ type: 'Text', text: /…$/ })).toBeDefined()
+
+  for (let i = 0; i < 7; i += 1) {
+    await $.tool.call({ tool: 'Read', tool_use_id: `r${i}`, file_path: '/tmp/x' })
+  }
+
+  // 0.9 × (1 − e^(−7/12)) ≈ 40%, marked as an estimate.
+  const mid = await $.ui.mount({ plugin: 'progress-bar', surface: 'terminal', ...BAND })
+  expect(await mid.find({ type: 'Text', text: /~40%$/ })).toBeDefined()
+
+  await $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId: 't1', reason: 'answer' })
+  const end = await $.ui.mount({ plugin: 'progress-bar', surface: 'terminal', ...BAND })
+  expect(await end.find({ type: 'Text', text: / 100%$/ })).toBeDefined()
+})

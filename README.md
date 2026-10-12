@@ -29,9 +29,19 @@ Answer `y` to add the marketplace, then press Enter to install at user scope. Th
 
 The bar spans the terminal's width and follows it when you resize.
 
+## What it accesses
+
+The bar is drawn only from events inside your Claude Code session: tool calls (it reads `TodoWrite`, `TaskCreate` and `TaskUpdate` inputs, and counts every call), subagent starts and ends, and turn starts and ends. It keeps its counts in session state.
+
+It makes no network requests, reads or writes no files, runs no processes, and does not change prompts, tool calls, tool results or permissions: every hook passes the event through unchanged.
+
 ## Commands
 
 - `/progress-bar` shows or hides the bar.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
 
 ## Develop
 

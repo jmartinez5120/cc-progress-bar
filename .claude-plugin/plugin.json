@@ -1,8 +1,12 @@
 {
   "name": "progress-bar",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A progress bar above the prompt showing how far along Claude is on the task, counting todos/tasks and spawned subagents",
-  "author": { "name": "jmartinez5120", "url": "https://github.com/jmartinez5120" },
+  "author": {
+    "name": "jmartinez5120",
+    "url": "https://github.com/jmartinez5120"
+  },
   "repository": "https://github.com/jmartinez5120/cc-progress-bar",
+  "license": "MIT",
   "types": "./types/index.d.ts"
 }

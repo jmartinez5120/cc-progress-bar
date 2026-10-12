@@ -35,6 +35,19 @@ The bar is drawn only from events inside your Claude Code session: tool calls (i
 
 It makes no network requests, reads or writes no files, runs no processes, and does not change prompts, tool calls, tool results or permissions: every hook passes the event through unchanged.
 
+### What each hook does
+
+| Hook | What it does | Changes anything? |
+| --- | --- | --- |
+| `session.start` | Registers the `/progress-bar` command | No |
+| `command.run` (`/progress-bar` only) | Answers that one command by toggling the bar's visibility; every other command passes by | Only answers its own command |
+| `prompt.submit` | Starts a new task when a person (terminal, Remote Control, SDK, scheduled task) submits a prompt; notifications and agent hand-backs continue the current one | No: the prompt passes through unchanged |
+| `turn.start` | Marks the task as working | No |
+| `tool.call` | Counts every tool call; for `TodoWrite`, `TaskCreate` and `TaskUpdate` it reads the input and result to track items | No: calls, inputs and results pass through unchanged |
+| `agent.spawn` | Records each subagent that starts (its type, description and parent) | No: the spawn, its prompt and its model pass through unchanged |
+| `turn.complete` | Marks a subagent or the main turn as finished and records the total time | No: the answer passes through unchanged |
+| `ui.render` (`AbovePrompt`) | Draws the bar above the prompt | Draws only its own band |
+
 ## Commands
 
 - `/progress-bar` shows or hides the bar.

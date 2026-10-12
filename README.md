@@ -52,6 +52,29 @@ It makes no network requests, reads or writes no files, runs no processes, and d
 
 - `/progress-bar` shows or hides the bar.
 
+## Files
+
+| Path | What it is |
+| --- | --- |
+| `.claude-plugin/plugin.json` | The manifest |
+| `.claude-plugin/marketplace.json` | Makes this repository its own marketplace, for `/plugin install` |
+| `.claude-plugin/icon.png` | The listing icon |
+| `hooks/hooks.json` | Points Claude Code at the mod's hooks module |
+| `hooks/register.tsx` | The mod: every hook and the bar's drawing |
+| `types/index.d.ts` | The mod's state contract |
+| `tests/progress.test.ts` | Tests, run with `claude plugin test .` |
+
+### Why `plugin.json` has a `types` field
+
+`types` names `types/index.d.ts`, the contract that declares the session state this mod keeps: `progress-bar.progress` (the task's todos, tasks, agents and counts) and `progress-bar.isHidden` (whether `/progress-bar` hid the bar). Claude Code's mod engine holds every state key a mod reads or writes to that contract, so `claude plugin validate` fails without it:
+
+```
+✘ progress-bar.isHidden is not declared: the manifest's types contract must name it …
+✘ progress-bar.progress is not declared: the manifest's types contract must name it …
+```
+
+Validators that check only the general plugin manifest schema may report `types` as an unrecognized field. That warning can be ignored: the field is required for this mod and changes nothing else about how the plugin loads.
+
 ## License
 
 MIT, see [LICENSE](LICENSE).
